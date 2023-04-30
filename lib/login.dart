@@ -1,5 +1,8 @@
 import 'package:amazon_cognito_identity_dart_2/cognito.dart';
+import 'package:amazon_cognito_identity_dart_2/sig_v4.dart';
 import 'package:flutter/material.dart';
+// ignore: depend_on_referenced_packages
+import 'package:http/http.dart' as http;
 
 final userPool =
     CognitoUserPool("ap-northeast-1_gR9vT2KF9", "3ropnok81guejmfv7vi5uuslba");
@@ -17,6 +20,7 @@ class _LoginState extends State<Login> {
   final _pwdController = TextEditingController(text: "qwerty123456");
   final _authCodeController = TextEditingController();
   bool _showAuthCodeInputArea = false;
+  CognitoUserSession? session;
 
   @override
   Widget build(BuildContext context) {
@@ -164,9 +168,9 @@ class _LoginState extends State<Login> {
                       username: email,
                       password: pwd,
                     );
-                    CognitoUserSession? session;
                     try {
                       session = await cognitoUser.authenticateUser(authDetails);
+                      debugPrint("session get ok");
                     } on CognitoUserNewPasswordRequiredException {
                       debugPrint("handle New Password challenge");
                       // handle New Password challenge
@@ -197,9 +201,67 @@ class _LoginState extends State<Login> {
                     } catch (e) {
                       debugPrint(e.toString());
                     }
-                    debugPrint(session?.getAccessToken().getJwtToken());
+                    debugPrint(
+                        "access token\n${session?.getAccessToken().getJwtToken()}");
+                    debugPrint(
+                        "id token\n${session?.getIdToken().getJwtToken()}");
+                    debugPrint(
+                        "refresh token\n${session?.getRefreshToken()?.token}");
                   },
                   child: const Text("Login"),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                      textStyle: const TextStyle(fontSize: 14)),
+                  onPressed: () async {
+                    final credentials = CognitoCredentials(
+                      "ap-northeast-1:0870ddcf-bbd7-457a-8d4e-3999e6cf8198",
+                      userPool,
+                    );
+                    await credentials
+                        .getAwsCredentials(session?.getIdToken().getJwtToken());
+                    // debugPrint("access key id:\n${credentials.accessKeyId}");
+                    // debugPrint(
+                    //     "secret access key:\n${credentials.secretAccessKey}");
+                    // debugPrint("session token:\n${credentials.sessionToken}");
+                    final awsSigV4Client = AwsSigV4Client(
+                      credentials.accessKeyId!,
+                      credentials.secretAccessKey!,
+                      "https://pjfk0guqbc.execute-api.ap-northeast-1.amazonaws.com/test/user_info",
+                      region: "ap-northeast-1",
+                      sessionToken: credentials.sessionToken,
+                    );
+
+                    final signedRequest = SigV4Request(
+                      awsSigV4Client,
+                      method: "GET",
+                      path: "",
+                    );
+                    // Map<String, String> map = Map.identity();
+                    // for (MapEntry<String, String?> item
+                    //     in signedRequest.headers!.entries) {
+                    //   if (item.value != null) {
+                    //     debugPrint("key: ${item.key}");
+                    //     debugPrint("value: ${item.value!}");
+                    //     map[item.key] = item.value!;
+                    //   }
+                    // }
+                    http.Response response;
+                    try {
+                      response = await http.get(Uri.parse(signedRequest.url!),
+                          headers: Map.from({
+                            "Authorization":
+                                session!.getIdToken().getJwtToken(),
+                          }));
+                      debugPrint(response.body);
+                    } catch (e) {
+                      debugPrint("error \n${e.toString()}");
+                    }
+                  },
+                  child: const Text("Login Token"),
                 ),
               ),
             ],
