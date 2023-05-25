@@ -37,6 +37,7 @@ dependencies:
   cupertino_icons: ^1.0.2
   amazon_cognito_identity_dart_2: ^3.3.0
   uni_links: ^0.5.1
+  shared_preferences: ^2.1.1
 
 dev_dependencies:
   flutter_test:
